@@ -1,38 +1,71 @@
 # ✨ Full Stack Realtime Chat App ✨
 
-!
-Highlights:
+Welcome to our Full Stack Realtime Chat App! This project demonstrates a modern, feature-rich chat application built with the MERN stack and enhanced with real-time capabilities.
 
-- 🌟 Tech stack: MERN + Socket.io + TailwindCSS + Daisy UI
-- 🎃 Authentication && Authorization with JWT
-- 👾 Real-time messaging with Socket.io
-- 🚀 Online user status
-- 👌 Global state management with Zustand
-- 🐞 Error handling both on the server and on the client
-- ⏳ And much more!
+## 🌟 Features
 
-### Setup .env file
+- 💬 Real-time messaging with Socket.io
+- 🔐 Secure authentication and authorization using JWT
+- 👥 User presence detection (online/offline status)
+- 🖼️ Profile picture upload and management
+- 🌓 Multiple theme options
+- 📱 Responsive design for various devices
+- 🚀 Efficient state management with Zustand
+- 🐞 Comprehensive error handling (server and client-side)
+
+## 🛠️ Tech Stack
+
+- **Frontend:** React.js, TailwindCSS, Daisy UI
+- **Backend:** Node.js, Express.js
+- **Database:** MongoDB
+- **Real-time Communication:** Socket.io
+- **State Management:** Zustand
+- **Authentication:** JSON Web Tokens (JWT)
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or later)
+- MongoDB
+- Git
+
+### Installation
+
+1. Clone the repository:
+
+```shell
+git clone https://github.com/ritwik1709/NexusChat.git
+```
+
+### Setup Environment variables
+Create a .env file in the backend directory with the following attributes:
 
 ```js
-MONGODB_URI=...
+MONGODB_URI=your_mongodb_connection_string
 PORT=5001
-JWT_SECRET=...
-
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-
+JWT_SECRET=your_jwt_secret_key
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 NODE_ENV=development
 ```
 
-### Build the app
-
+### Build the app (To install all dependencies)
+Run this command from the folder fullstack-chat-app-master
 ```shell
 npm run build
 ```
 
-### Start the app
+### Start the backend
+Run this command from the folder fullstack-chat-app-master
 
 ```shell
 npm start
+```
+### Start the frontend
+Run this command from the frontend folder
+
+```shell
+npm run dev
 ```
