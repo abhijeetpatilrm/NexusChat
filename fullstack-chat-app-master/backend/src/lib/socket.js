@@ -9,7 +9,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://your-netlify-site.netlify.app", // Replace with your actual Netlify URL
+      /\.onrender\.com$/, // Allow all Render subdomains
       /\.netlify\.app$/, // Allow all Netlify subdomains
     ],
     credentials: true,
