@@ -4,6 +4,10 @@ import { useEffect, useRef } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
+import EmojiReactions from "./EmojiReactions";
+import MessageStatus from "./MessageStatus";
+import TypingIndicator from "./TypingIndicator";
+import FilePreview from "./FilePreview";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 
@@ -15,17 +19,33 @@ const ChatContainer = () => {
     selectedUser,
     subscribeToMessages,
     unsubscribeFromMessages,
+    addReaction,
+    removeReaction,
+    markAllAsRead,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
+
+  const handleReactionAdd = (messageId, emoji) => {
+    addReaction(messageId, emoji);
+  };
+
+  const handleReactionRemove = (messageId, emoji) => {
+    removeReaction(messageId, emoji);
+  };
 
   useEffect(() => {
     getMessages(selectedUser._id);
 
     subscribeToMessages();
 
+    // Mark all messages as read when opening a chat
+    if (selectedUser) {
+      markAllAsRead(selectedUser._id);
+    }
+
     return () => unsubscribeFromMessages();
-  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages, markAllAsRead]);
 
   useEffect(() => {
     if (messageEndRef.current && messages) {
@@ -79,11 +99,38 @@ const ChatContainer = () => {
                   className="sm:max-w-[200px] rounded-md mb-2"
                 />
               )}
-              {message.text && <p>{message.text}</p>}
+              {message.file && (
+                <FilePreview 
+                  file={message.file} 
+                  isOwnMessage={message.senderId === authUser._id}
+                />
+              )}
+              {message.text && (
+                <p className="whitespace-pre-wrap">{message.text}</p>
+              )}
+              
+              {/* Emoji Reactions */}
+              <EmojiReactions
+                messageId={message._id}
+                reactions={message.reactions || {}}
+                onReactionAdd={handleReactionAdd}
+                onReactionRemove={handleReactionRemove}
+                currentUserId={authUser._id}
+              />
+              
+              {/* Message Status */}
+              <MessageStatus
+                status={message.status || 'sent'}
+                readAt={message.readAt}
+                isOwnMessage={message.senderId === authUser._id}
+              />
             </div>
           </div>
         ))}
       </div>
+
+      {/* Typing Indicator */}
+      <TypingIndicator selectedUser={selectedUser} />
 
       <MessageInput />
     </div>

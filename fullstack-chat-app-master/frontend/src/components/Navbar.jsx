@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { LogOut, MessageSquare, Settings, User } from "lucide-react";
+import { LogOut, MessageSquare, Settings, User, Users, Plus } from "lucide-react";
+import CreateGroupModal from "./CreateGroupModal";
 
 const Navbar = () => {
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const { logout, authUser } = useAuthStore();
 
   return (
@@ -22,6 +25,17 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {authUser && (
+              <button
+                onClick={() => setShowCreateGroup(true)}
+                className="btn btn-sm btn-primary gap-2"
+                title="Create Group"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Create Group</span>
+              </button>
+            )}
+
             <Link
               to={"/settings"}
               className={`
@@ -49,6 +63,12 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+      />
     </header>
   );
 };

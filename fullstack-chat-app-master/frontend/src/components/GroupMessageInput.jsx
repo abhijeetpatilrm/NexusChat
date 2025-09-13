@@ -1,24 +1,23 @@
 import { useRef, useState, useEffect } from "react";
-import { useChatStore } from "../store/useChatStore";
-import { useAuthStore } from "../store/useAuthStore";
+import { useGroupStore } from "../store/useGroupStore.js";
+import { useAuthStore } from "../store/useAuthStore.js";
 import { Image, Send, X, Smile, Paperclip } from "lucide-react";
 import toast from "react-hot-toast";
-import EmojiPicker from "./EmojiPicker";
-import SmartReplySuggestions from "./SmartReplySuggestions";
-import FilePreview from "./FilePreview";
+import EmojiPicker from "./EmojiPicker.jsx";
+import FilePreview from "./FilePreview.jsx";
 
-const MessageInput = () => {
+const GroupMessageInput = ({ group }) => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [showSmartReplies, setShowSmartReplies] = useState(true);
   const fileInputRef = useRef(null);
   const documentInputRef = useRef(null);
   const textInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const { sendMessage, messages, selectedUser } = useChatStore();
+  
+  const { sendGroupMessage } = useGroupStore();
   const { socket } = useAuthStore();
 
   const handleImageChange = (e) => {
@@ -112,8 +111,8 @@ const MessageInput = () => {
     setText(newText);
     setCursorPosition(e.target.selectionStart);
     
-    // Handle typing indicators
-    if (socket && selectedUser) {
+    // Handle typing indicators for group
+    if (socket && group) {
       // Clear existing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -121,22 +120,22 @@ const MessageInput = () => {
       
       // Emit typing start if there's text
       if (newText.trim().length > 0) {
-        socket.emit("typing", {
-          receiverId: selectedUser._id,
+        socket.emit("groupTyping", {
+          groupId: group._id,
           isTyping: true
         });
         
         // Set timeout to stop typing after 2 seconds of inactivity
         typingTimeoutRef.current = setTimeout(() => {
-          socket.emit("typing", {
-            receiverId: selectedUser._id,
+          socket.emit("groupTyping", {
+            groupId: group._id,
             isTyping: false
           });
         }, 2000);
       } else {
         // Emit typing stop if text is empty
-        socket.emit("typing", {
-          receiverId: selectedUser._id,
+        socket.emit("groupTyping", {
+          groupId: group._id,
           isTyping: false
         });
       }
@@ -149,69 +148,20 @@ const MessageInput = () => {
     }
   };
 
-  const handleSmartReplySelect = (suggestion) => {
-    setText(suggestion);
-    setShowSmartReplies(false);
-    // Focus the input after selecting a suggestion
-    setTimeout(() => {
-      if (textInputRef.current) {
-        textInputRef.current.focus();
-        textInputRef.current.setSelectionRange(suggestion.length, suggestion.length);
-      }
-    }, 0);
-  };
-
-  // Get the last message from the other user
-  const getLastMessage = () => {
-    if (!selectedUser || !messages.length) return null;
-    
-    // Find the last message from the selected user (not from current user)
-    const lastMessage = messages
-      .filter(msg => msg.senderId === selectedUser._id)
-      .slice(-1)[0];
-    
-    // Debug logging (commented out for production)
-    // console.log('MessageInput Debug:', {
-    //   selectedUser: selectedUser?.fullName,
-    //   messagesCount: messages.length,
-    //   lastMessage: lastMessage?.text,
-    //   showSmartReplies,
-    //   textEmpty: !text.trim(),
-    //   noImagePreview: !imagePreview
-    // });
-    
-    return lastMessage;
-  };
-
-  // Cleanup typing indicator on unmount
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      if (socket && selectedUser) {
-        socket.emit("typing", {
-          receiverId: selectedUser._id,
-          isTyping: false
-        });
-      }
-    };
-  }, [socket, selectedUser]);
-
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!text.trim() && !imagePreview && !filePreview) return;
 
     // Stop typing indicator when sending message
-    if (socket && selectedUser) {
-      socket.emit("typing", {
-        receiverId: selectedUser._id,
+    if (socket && group) {
+      socket.emit("groupTyping", {
+        groupId: group._id,
         isTyping: false
       });
     }
 
     try {
-      await sendMessage({
+      await sendGroupMessage(group._id, {
         text: text.trim(),
         image: imagePreview,
         file: filePreview,
@@ -221,24 +171,32 @@ const MessageInput = () => {
       setText("");
       setImagePreview(null);
       setFilePreview(null);
-      setShowSmartReplies(true); // Show smart replies again after sending
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (documentInputRef.current) documentInputRef.current.value = "";
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error("Failed to send group message:", error);
     }
   };
 
+  // Cleanup typing indicator on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (socket && group) {
+        socket.emit("groupTyping", {
+          groupId: group._id,
+          isTyping: false
+        });
+      }
+    };
+  }, [socket, group]);
+
+  if (!group) return null;
+
   return (
     <div className="w-full">
-      {/* Smart Reply Suggestions */}
-      <SmartReplySuggestions
-        lastMessage={getLastMessage()}
-        onSuggestionSelect={handleSmartReplySelect}
-        isVisible={showSmartReplies && !text.trim() && !imagePreview && !filePreview && selectedUser}
-        currentUser={selectedUser}
-      />
-      
       <div className="p-4">
         {imagePreview && (
           <div className="mb-3 flex items-center gap-2">
@@ -270,95 +228,88 @@ const MessageInput = () => {
           </div>
         )}
 
-      <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-        <div className="flex-1 flex gap-2 relative">
-          <input
-            ref={textInputRef}
-            type="text"
-            className="w-full input input-bordered rounded-lg input-sm sm:input-md"
-            placeholder="Type a message... (try :smile: for emojis)"
-            value={text}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            onSelect={(e) => setCursorPosition(e.target.selectionStart)}
-          />
-          
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleImageChange}
-          />
+        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <div className="flex-1 flex gap-2 relative">
+            <input
+              ref={textInputRef}
+              type="text"
+              className="w-full input input-bordered rounded-lg input-sm sm:input-md"
+              placeholder={`Message ${group.name}...`}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              onSelect={(e) => setCursorPosition(e.target.selectionStart)}
+            />
 
-          {/* Emoji Picker Button */}
-          <div className="relative">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="btn btn-sm btn-circle btn-ghost"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                title="Add emoji"
+              >
+                <Smile size={20} />
+              </button>
+              
+              {showEmojiPicker && (
+                <EmojiPicker
+                  onEmojiSelect={handleEmojiSelect}
+                  onClose={() => setShowEmojiPicker(false)}
+                  isOpen={showEmojiPicker}
+                />
+              )}
+            </div>
+
+            {/* Image Upload Button */}
             <button
               type="button"
-              className={`btn btn-circle ${showEmojiPicker ? "btn-primary" : "btn-ghost"}`}
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              title="Add emoji"
+              className={`hidden sm:flex btn btn-circle
+                       ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload image"
             >
-              <Smile size={20} />
+              <Image size={20} />
             </button>
-            
-            {showEmojiPicker && (
-              <EmojiPicker
-                onEmojiSelect={handleEmojiSelect}
-                onClose={() => setShowEmojiPicker(false)}
-                isOpen={showEmojiPicker}
-              />
-            )}
+
+            {/* File Upload Button */}
+            <button
+              type="button"
+              className={`hidden sm:flex btn btn-circle
+                       ${filePreview ? "text-emerald-500" : "text-zinc-400"}`}
+              onClick={() => documentInputRef.current?.click()}
+              title="Upload file"
+            >
+              <Paperclip size={20} />
+            </button>
           </div>
-
-          {/* Image Upload Button */}
+          
           <button
-            type="button"
-            className={`hidden sm:flex btn btn-circle
-                     ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
-            onClick={() => fileInputRef.current?.click()}
-            title="Upload image"
+            type="submit"
+            className="btn btn-sm btn-circle"
+            disabled={!text.trim() && !imagePreview && !filePreview}
           >
-            <Image size={20} />
+            <Send size={22} />
           </button>
+        </form>
 
-          {/* File Upload Button */}
-          <button
-            type="button"
-            className={`hidden sm:flex btn btn-circle
-                     ${filePreview ? "text-emerald-500" : "text-zinc-400"}`}
-            onClick={() => documentInputRef.current?.click()}
-            title="Upload file"
-          >
-            <Paperclip size={20} />
-          </button>
-        </div>
-        <button
-          type="submit"
-          className="btn btn-sm btn-circle"
-          disabled={!text.trim() && !imagePreview && !filePreview}
-        >
-          <Send size={22} />
-        </button>
-      </form>
-
-      {/* Hidden file inputs */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleImageChange}
-        accept="image/*"
-        className="hidden"
-      />
-      <input
-        type="file"
-        ref={documentInputRef}
-        onChange={handleFileChange}
-        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.mp4,.avi,.mp3,.wav"
-        className="hidden"
-      />
+        {/* Hidden file inputs */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageChange}
+          accept="image/*"
+          className="hidden"
+        />
+        <input
+          type="file"
+          ref={documentInputRef}
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.mp4,.avi,.mp3,.wav"
+          className="hidden"
+        />
       </div>
     </div>
   );
 };
-export default MessageInput;
+
+export default GroupMessageInput;

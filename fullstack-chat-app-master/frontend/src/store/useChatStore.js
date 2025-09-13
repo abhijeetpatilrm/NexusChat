@@ -51,6 +51,49 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  addReaction: async (messageId, emoji) => {
+    try {
+      const res = await axiosInstance.post(`/messages/reaction/${messageId}`, { emoji });
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => 
+        msg._id === messageId ? { ...msg, reactions: res.data.reactions } : msg
+      );
+      set({ messages: updatedMessages });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to add reaction");
+    }
+  },
+
+  removeReaction: async (messageId, emoji) => {
+    try {
+      const res = await axiosInstance.delete(`/messages/reaction/${messageId}`, { data: { emoji } });
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => 
+        msg._id === messageId ? { ...msg, reactions: res.data.reactions } : msg
+      );
+      set({ messages: updatedMessages });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to remove reaction");
+    }
+  },
+
+  markAsRead: async (messageId) => {
+    try {
+      await axiosInstance.put(`/messages/read/${messageId}`);
+    } catch (error) {
+      console.error("Failed to mark message as read:", error);
+    }
+  },
+
+  markAllAsRead: async (senderId) => {
+    try {
+      console.log("Marking all messages as read for sender:", senderId);
+      await axiosInstance.put(`/messages/read-all/${senderId}`);
+    } catch (error) {
+      console.error("Failed to mark all messages as read:", error);
+    }
+  },
+
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
@@ -66,11 +109,48 @@ export const useChatStore = create((set, get) => ({
         messages: [...get().messages, newMessage],
       });
     });
+
+    socket.on("reactionUpdate", (reactionData) => {
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => 
+        msg._id === reactionData.messageId ? { ...msg, reactions: reactionData.reactions } : msg
+      );
+      set({ messages: updatedMessages });
+    });
+
+    socket.on("messageStatusUpdate", (statusData) => {
+      console.log("Received messageStatusUpdate:", statusData);
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => 
+        msg._id === statusData.messageId ? { 
+          ...msg, 
+          status: statusData.status,
+          readAt: statusData.readAt
+        } : msg
+      );
+      set({ messages: updatedMessages });
+    });
+
+    socket.on("allMessagesRead", (readData) => {
+      console.log("Received allMessagesRead:", readData);
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => 
+        msg.senderId === readData.receiverId ? { 
+          ...msg, 
+          status: 'read',
+          readAt: readData.readAt
+        } : msg
+      );
+      set({ messages: updatedMessages });
+    });
   },
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket.off("newMessage");
+    socket.off("reactionUpdate");
+    socket.off("messageStatusUpdate");
+    socket.off("allMessagesRead");
   },
 
   setSelectedUser: (selectedUser) => set({ selectedUser }),
