@@ -1,1 +1,1 @@
-web: cd fullstack-chat-app-master/backend && npm start
+web: cd backend && npm start
