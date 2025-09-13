@@ -1,0 +1,14 @@
+{
+  "name": "nexus-chat-src",
+  "version": "1.0.0",
+  "description": "Source package.json for Render deployment",
+  "main": "index.js",
+  "scripts": {
+    "build": "cd .. && npm run build",
+    "start": "cd .. && npm start",
+    "install": "cd .. && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
