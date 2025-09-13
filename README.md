@@ -69,3 +69,13 @@ Run this command from the frontend folder
 ```shell
 npm run dev
 ```
+
+
+## Contact
+
+If you want to contact me, you can reach me through the handles below.
+
+[![linkedin](https://img.shields.io/badge/Abhijeet_Patil-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/abhijeet-patil-b23b94228/)
+[![GitHub](https://img.shields.io/badge/Abhijeet_Patil-20232A?style=for-the-badge&logo=Github&logoColor=white)](https://github.com/abhijeetpatilrm)
+
+© 2025 Abhijeet Patil
