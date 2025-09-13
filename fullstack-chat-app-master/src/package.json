@@ -4,7 +4,7 @@
   "description": "Fullstack Chat App",
   "main": "index.js",
   "scripts": {
-    "build": "cd ../backend && npm install && cd ../frontend && npm install && npm run build",
+    "build": "npm install --prefix ../backend && npm install --prefix ../frontend && npm run build --prefix ../frontend",
     "start": "cd ../backend && npm start"
   },
   "keywords": [],
