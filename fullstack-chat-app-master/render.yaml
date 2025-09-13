@@ -3,8 +3,8 @@ services:
     name: nexus-chat-app
     env: node
     plan: free
-    buildCommand: npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
-    startCommand: cd backend && npm start
+    buildCommand: cd fullstack-chat-app-master && npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: cd fullstack-chat-app-master/backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
