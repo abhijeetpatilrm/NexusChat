@@ -55,3 +55,4 @@ After adding environment variables, trigger a new deploy.
 - If Socket.io doesn't work, check CORS settings
 - If file uploads fail, verify Cloudinary credentials
 - If database connection fails, check MongoDB URI
+

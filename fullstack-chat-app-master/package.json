@@ -1,14 +1,19 @@
 {
   "name": "chat-app",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Full-stack chat application",
+  "main": "backend/src/index.js",
   "scripts": {
-    "build": "echo 'Use src/package.json for build'",
+    "build": "cd frontend && npm install && npm run build",
     "start": "cd backend && npm start",
-    "install": "echo 'Use src/package.json for install'"
+    "install": "cd backend && npm install && cd ../frontend && npm install",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "postinstall": "npm run install"
   },
-  "keywords": [],
+  "keywords": ["chat", "react", "nodejs", "socket.io"],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
 }
