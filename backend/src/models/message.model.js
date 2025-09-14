@@ -29,6 +29,47 @@ const messageSchema = new mongoose.Schema(
     text: {
       type: String,
     },
+    encryptedData: {
+      encryptedData: {
+        type: String,
+        default: null,
+      },
+      iv: {
+        type: String,
+        default: null,
+      },
+      authTag: {
+        type: String,
+        default: null,
+      },
+      algorithm: {
+        type: String,
+        default: 'AES-256-CBC-HMAC',
+      },
+      messageHash: {
+        type: String,
+        default: null,
+      },
+      keyId: {
+        type: String,
+        default: null,
+      },
+    },
+    encryption: {
+      isEncrypted: {
+        type: Boolean,
+        default: false,
+      },
+      securityLevel: {
+        type: String,
+        enum: ['standard', 'enterprise', 'military'],
+        default: 'enterprise',
+      },
+      encryptedAt: {
+        type: Date,
+        default: null,
+      },
+    },
     image: {
       type: String,
     },

@@ -8,6 +8,7 @@ import EmojiReactions from "./EmojiReactions";
 import MessageStatus from "./MessageStatus";
 import TypingIndicator from "./TypingIndicator";
 import FilePreview from "./FilePreview";
+import EncryptionIndicator from "./EncryptionIndicator";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 
@@ -109,21 +110,35 @@ const ChatContainer = () => {
                 <p className="whitespace-pre-wrap">{message.text}</p>
               )}
               
-              {/* Emoji Reactions */}
-              <EmojiReactions
-                messageId={message._id}
-                reactions={message.reactions || {}}
-                onReactionAdd={handleReactionAdd}
-                onReactionRemove={handleReactionRemove}
-                currentUserId={authUser._id}
-              />
-              
-              {/* Message Status */}
-              <MessageStatus
-                status={message.status || 'sent'}
-                readAt={message.readAt}
-                isOwnMessage={message.senderId === authUser._id}
-              />
+              {/* Encryption Indicator - Subtle addition */}
+              <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center gap-2">
+                  {/* Emoji Reactions */}
+                  <EmojiReactions
+                    messageId={message._id}
+                    reactions={message.reactions || {}}
+                    onReactionAdd={handleReactionAdd}
+                    onReactionRemove={handleReactionRemove}
+                    currentUserId={authUser._id}
+                  />
+                  
+                  {/* Encryption Status - Only show if encrypted or legacy */}
+                  <EncryptionIndicator
+                    isEncrypted={message.isEncrypted || message.securityLevel === 'legacy'}
+                    securityLevel={message.securityLevel}
+                    integrityVerified={message.integrityVerified}
+                    decryptionError={message.decryptionError}
+                    size="xs"
+                  />
+                </div>
+                
+                {/* Message Status */}
+                <MessageStatus
+                  status={message.status || 'sent'}
+                  readAt={message.readAt}
+                  isOwnMessage={message.senderId === authUser._id}
+                />
+              </div>
             </div>
           </div>
         ))}

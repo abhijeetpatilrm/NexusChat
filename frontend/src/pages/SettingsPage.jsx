@@ -1,6 +1,7 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send } from "lucide-react";
+import { Send, Shield } from "lucide-react";
+import SecuritySettings from "../components/SecuritySettings";
 
 const PREVIEW_MESSAGES = [
   { id: 1, content: "Hey! How's it going?", isSent: false },
@@ -12,7 +13,7 @@ const SettingsPage = () => {
 
   return (
     <div className="h-screen container mx-auto px-4 pt-20 max-w-5xl">
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold">Theme</h2>
           <p className="text-sm text-base-content/70">Choose a theme for your chat interface</p>
@@ -108,6 +109,19 @@ const SettingsPage = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Security Settings Section */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-green-500" />
+            <h2 className="text-lg font-semibold">Security & Encryption</h2>
+          </div>
+          <p className="text-sm text-base-content/70">
+            Manage your message encryption and security settings
+          </p>
+          
+          <SecuritySettings />
         </div>
       </div>
     </div>

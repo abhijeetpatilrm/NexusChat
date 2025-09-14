@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, Shield } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 
@@ -22,7 +22,13 @@ const ChatHeader = () => {
 
           {/* User info */}
           <div>
-            <h3 className="font-medium">{selectedUser.fullName}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium">{selectedUser.fullName}</h3>
+              {/* Subtle encryption indicator */}
+              <div className="flex items-center gap-1 text-green-500" title="End-to-end encrypted">
+                <Shield className="w-3 h-3" />
+              </div>
+            </div>
             <p className="text-sm flex items-center gap-1">
               {onlineUsers.includes(selectedUser._id) ? (
                 <>

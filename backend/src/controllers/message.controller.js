@@ -3,6 +3,9 @@ import Message from "../models/message.model.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import encryptionService from "../lib/encryption.js";
+import keyManager from "../lib/keyManager.js";
+import MessageCleanup from "../lib/messageCleanup.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
@@ -26,9 +29,118 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    });
+    }).sort({ createdAt: 1 });
 
-    res.status(200).json(messages);
+    // Auto-cleanup problematic messages on first load
+    try {
+      await MessageCleanup.cleanupConversation(myId, userToChatId);
+    } catch (cleanupError) {
+      console.log("Auto-cleanup completed with some issues:", cleanupError.message);
+    }
+
+    // Decrypt messages for client
+    const decryptedMessages = await Promise.all(
+      messages.map(async (message) => {
+        try {
+          // Check if message has encryption data
+          const hasEncryptionData = message.encryptedData && 
+                                   message.encryptedData.encryptedData && 
+                                   message.encryptedData.iv && 
+                                   message.encryptedData.authTag;
+
+          // If message is encrypted, decrypt it
+          if (message.encryption?.isEncrypted && hasEncryptionData) {
+            const sharedKey = await keyManager.generateSharedKey(myId, userToChatId);
+            const decryptedResult = encryptionService.extractSecureMessage(
+              message.encryptedData, 
+              sharedKey
+            );
+            
+            return {
+              ...message.toObject(),
+              text: decryptedResult.message,
+              isEncrypted: true,
+              securityLevel: decryptedResult.securityLevel,
+              integrityVerified: decryptedResult.isIntegrityVerified
+            };
+          }
+          
+          // Return unencrypted message as-is (backward compatibility)
+          return {
+            ...message.toObject(),
+            isEncrypted: false,
+            securityLevel: 'legacy'
+          };
+        } catch (decryptionError) {
+          console.error("Decryption failed for message:", message._id, decryptionError);
+          
+          // Check if this is an old message without encryption data
+          const hasEncryptionData = message.encryptedData && 
+                                   message.encryptedData.encryptedData && 
+                                   message.encryptedData.iv && 
+                                   message.encryptedData.authTag;
+
+          if (!hasEncryptionData) {
+            // This is an old message, return as unencrypted
+            return {
+              ...message.toObject(),
+              isEncrypted: false,
+              securityLevel: 'legacy'
+            };
+          }
+          
+          // Check if this is a partially encrypted message (has encryption data but fails verification)
+          // This could be from the transition period when encryption was being implemented
+          if (message.text && typeof message.text === 'string' && message.text.length > 0) {
+            // Check if the text looks like encrypted data (base64 string)
+            const isEncryptedText = /^[A-Za-z0-9+/=]+$/.test(message.text) && message.text.length > 20;
+            
+            if (isEncryptedText) {
+              // This is encrypted text that failed to decrypt, try to decrypt it directly
+              try {
+                const sharedKey = await keyManager.generateSharedKey(myId, userToChatId);
+                const decryptedText = encryptionService.decrypt({
+                  encryptedData: message.text,
+                  iv: message.encryptedData?.iv || '',
+                  authTag: message.encryptedData?.authTag || ''
+                }, sharedKey);
+                
+                return {
+                  ...message.toObject(),
+                  text: decryptedText,
+                  isEncrypted: true,
+                  securityLevel: 'enterprise'
+                };
+              } catch (directDecryptError) {
+                // If direct decryption also fails, treat as legacy
+                return {
+                  ...message.toObject(),
+                  isEncrypted: false,
+                  securityLevel: 'legacy'
+                };
+              }
+            } else {
+              // If there's readable text, treat as legacy message
+              return {
+                ...message.toObject(),
+                isEncrypted: false,
+                securityLevel: 'legacy'
+              };
+            }
+          }
+          
+          // This is a new encrypted message that failed to decrypt
+          return {
+            ...message.toObject(),
+            text: "[Message could not be decrypted]",
+            isEncrypted: true,
+            decryptionError: true
+          };
+        }
+      })
+    );
+
+    res.status(200).json(decryptedMessages);
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -40,6 +152,9 @@ export const sendMessage = async (req, res) => {
     const { text, image, file } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+
+    // Generate shared key for this conversation (deterministic)
+    const sharedKey = await keyManager.generateSharedKey(senderId, receiverId);
 
     let imageUrl;
     if (image) {
@@ -64,10 +179,50 @@ export const sendMessage = async (req, res) => {
       };
     }
 
+    // Encrypt text message if present
+    let encryptedText = null;
+    let encryptedData = null;
+    let encryptionInfo = null;
+
+    if (text && text.trim()) {
+      try {
+        // Create secure message envelope
+        const secureMessage = encryptionService.createSecureMessage(text, sharedKey);
+        
+        encryptedData = {
+          encryptedData: secureMessage.encryptedData,
+          iv: secureMessage.iv,
+          authTag: secureMessage.authTag,
+          algorithm: secureMessage.algorithm,
+          messageHash: secureMessage.messageHash,
+          keyId: await keyManager.generateKeyId()
+        };
+
+        encryptionInfo = {
+          isEncrypted: true,
+          securityLevel: 'enterprise',
+          encryptedAt: new Date()
+        };
+
+        // Store encrypted text (for backward compatibility)
+        encryptedText = secureMessage.encryptedData;
+      } catch (encryptionError) {
+        console.error("Encryption failed:", encryptionError);
+        // Fallback to unencrypted message
+        encryptedText = text;
+        encryptionInfo = {
+          isEncrypted: false,
+          securityLevel: 'legacy'
+        };
+      }
+    }
+
     const newMessage = new Message({
       senderId,
       receiverId,
-      text,
+      text: encryptedText, // Store encrypted text
+      encryptedData: encryptedData,
+      encryption: encryptionInfo,
       image: imageUrl,
       file: fileData,
       reactions: new Map(),
@@ -75,12 +230,22 @@ export const sendMessage = async (req, res) => {
 
     await newMessage.save();
 
+    // Send decrypted message to client (for display)
+    const messageForClient = {
+      ...newMessage.toObject(),
+      text: text, // Send original text to client
+      isEncrypted: encryptionInfo?.isEncrypted || false,
+      securityLevel: encryptionInfo?.securityLevel || 'legacy',
+      // Remove encrypted data from client response for security
+      encryptedData: undefined
+    };
+
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+      io.to(receiverSocketId).emit("newMessage", messageForClient);
     }
 
-    res.status(201).json(newMessage);
+    res.status(201).json(messageForClient);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });

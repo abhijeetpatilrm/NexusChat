@@ -20,6 +20,46 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    encryptionKey: {
+      keyId: {
+        type: String,
+        default: null,
+      },
+      key: {
+        type: String,
+        default: null,
+      },
+      createdAt: {
+        type: Date,
+        default: null,
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      isActive: {
+        type: Boolean,
+        default: false,
+      },
+      rotatedAt: {
+        type: Date,
+        default: null,
+      },
+    },
+    securitySettings: {
+      encryptionEnabled: {
+        type: Boolean,
+        default: true,
+      },
+      keyRotationEnabled: {
+        type: Boolean,
+        default: true,
+      },
+      lastSecurityUpdate: {
+        type: Date,
+        default: Date.now,
+      },
+    },
   },
   { timestamps: true }
 );
