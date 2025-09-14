@@ -1,19 +1,18 @@
 #!/bin/bash
-set -e
 
-echo "🚀 Starting build process..."
+echo "Starting build process..."
 
-# Install backend dependencies
-echo "📦 Installing backend dependencies..."
-cd backend
-npm install
-cd ..
-
-# Install frontend dependencies  
-echo "📦 Installing frontend dependencies..."
+# Install frontend dependencies and build
+echo "Building frontend..."
 cd frontend
 npm install
 npm run build
 cd ..
 
-echo "✅ Build completed successfully!"
+# Install backend dependencies
+echo "Installing backend dependencies..."
+cd backend
+npm install
+cd ..
+
+echo "Build completed successfully!"
