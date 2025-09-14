@@ -1,4 +1,4 @@
-// This is a serverless function wrapper for your backend
+// This is a serverless function wrapper for backend
 // Note: This won't work with Socket.io due to Vercel's limitations
 import express from 'express';
 import cors from 'cors';
