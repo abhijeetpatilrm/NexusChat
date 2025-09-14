@@ -8,7 +8,8 @@
     "start": "cd backend && npm start",
     "install": "cd backend && npm install && cd ../frontend && npm install",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
-    "postinstall": "npm run install"
+    "frontend:build": "cd frontend && npm install && npm run build",
+    "backend:start": "cd backend && npm start"
   },
   "keywords": ["chat", "react", "nodejs", "socket.io"],
   "author": "",
