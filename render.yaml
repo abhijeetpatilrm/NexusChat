@@ -10,3 +10,13 @@ services:
         value: production
       - key: VITE_API_URL
         value: https://nexuschat-l9mc.onrender.com/api
+      - key: MONGO_URI
+        value: REPLACE_WITH_YOUR_ATLAS_URI
+      - key: JWT_SECRET
+        value: REPLACE_WITH_A_STRONG_SECRET
+      - key: CLOUDINARY_CLOUD_NAME
+        value: REPLACE_WITH_CLOUDINARY_CLOUD_NAME
+      - key: CLOUDINARY_API_KEY
+        value: REPLACE_WITH_CLOUDINARY_API_KEY
+      - key: CLOUDINARY_API_SECRET
+        value: REPLACE_WITH_CLOUDINARY_API_SECRET
