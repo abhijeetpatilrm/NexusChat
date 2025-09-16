@@ -29,6 +29,7 @@ app.use(
       "http://localhost:5173",
       /\.onrender\.com$/, // Allow all Render subdomains
       /\.netlify\.app$/, // Allow all Netlify subdomains
+      "https://nexuschat-l9mc.onrender.com",
     ],
     credentials: true,
   })
