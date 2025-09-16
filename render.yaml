@@ -3,8 +3,10 @@ services:
     name: nexus-chat-backend
     env: node
     plan: free
-    buildCommand: cd backend && npm install
+    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && npm ci
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: VITE_API_URL
+        value: https://nexuschat-l9mc.onrender.com/api
