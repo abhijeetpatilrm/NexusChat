@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import groupRoutes from "./routes/group.route.js";
 import securityRoutes from "./routes/security.route.js";
+import aiRoutes from "./routes/ai.route.js";
 import { app, server } from "./lib/socket.js";
 
 dotenv.config();
@@ -40,6 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/security", securityRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Serve static files from frontend build (for production)
 if (process.env.NODE_ENV === "production") {

@@ -11,12 +11,12 @@ services:
       - key: VITE_API_URL
         value: https://nexuschat-l9mc.onrender.com/api
       - key: MONGO_URI
-        value: 
+        value: mongodb+srv://nexuschat_user:NexusChat2026@cluster0.lbqllmy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - key: JWT_SECRET
-        value: REPLACE_WITH_A_STRONG_SECRET
+        value: f836322454cdf66e7a4e8e94df9e89ce8d37d5023558b4bef61cfecb1268817b
       - key: CLOUDINARY_CLOUD_NAME
-        value: REPLACE_WITH_CLOUDINARY_CLOUD_NAME
+        value: daighlwid
       - key: CLOUDINARY_API_KEY
-        value: REPLACE_WITH_CLOUDINARY_API_KEY
+        value: 853914822757919
       - key: CLOUDINARY_API_SECRET
-        value: REPLACE_WITH_CLOUDINARY_API_SECRET
+        value: ldQZgsOv9-hEyt6B7BC3HT8iqWg

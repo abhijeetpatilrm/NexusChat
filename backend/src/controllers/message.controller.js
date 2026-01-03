@@ -10,7 +10,9 @@ import MessageCleanup from "../lib/messageCleanup.js";
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    const filteredUsers = await User.find({
+      _id: { $ne: loggedInUserId },
+    }).select("-password");
 
     res.status(200).json(filteredUsers);
   } catch (error) {
@@ -35,112 +37,74 @@ export const getMessages = async (req, res) => {
     try {
       await MessageCleanup.cleanupConversation(myId, userToChatId);
     } catch (cleanupError) {
-      console.log("Auto-cleanup completed with some issues:", cleanupError.message);
+      console.log(
+        "Auto-cleanup completed with some issues:",
+        cleanupError.message
+      );
     }
 
-    // Decrypt messages for client
-    const decryptedMessages = await Promise.all(
+    // Process messages and handle old encrypted messages
+    const processedMessages = await Promise.all(
       messages.map(async (message) => {
-        try {
-          // Check if message has encryption data
-          const hasEncryptionData = message.encryptedData && 
-                                   message.encryptedData.encryptedData && 
-                                   message.encryptedData.iv && 
-                                   message.encryptedData.authTag;
+        const messageObj = message.toObject();
 
-          // If message is encrypted, decrypt it
-          if (message.encryption?.isEncrypted && hasEncryptionData) {
-            const sharedKey = await keyManager.generateSharedKey(myId, userToChatId);
-            const decryptedResult = encryptionService.extractSecureMessage(
-              message.encryptedData, 
+        // Check if this is an old encrypted message (text field contains encrypted data)
+        const hasEncryptionData =
+          message.encryptedData &&
+          message.encryptedData.encryptedData &&
+          message.encryptedData.iv &&
+          message.encryptedData.authTag;
+
+        // Check if text looks like encrypted data (base64 string)
+        const textLooksEncrypted =
+          message.text &&
+          /^[A-Za-z0-9+/=]+$/.test(message.text) &&
+          message.text.length > 20;
+
+        // If text is encrypted (old format), decrypt it
+        if (textLooksEncrypted && hasEncryptionData) {
+          try {
+            const sharedKey = await keyManager.generateSharedKey(
+              myId,
+              userToChatId
+            );
+            const decryptedText = encryptionService.decrypt(
+              message.encryptedData,
               sharedKey
             );
-            
-            return {
-              ...message.toObject(),
-              text: decryptedResult.message,
-              isEncrypted: true,
-              securityLevel: decryptedResult.securityLevel,
-              integrityVerified: decryptedResult.isIntegrityVerified
-            };
-          }
-          
-          // Return unencrypted message as-is (backward compatibility)
-          return {
-            ...message.toObject(),
-            isEncrypted: false,
-            securityLevel: 'legacy'
-          };
-        } catch (decryptionError) {
-          console.error("Decryption failed for message:", message._id, decryptionError);
-          
-          // Check if this is an old message without encryption data
-          const hasEncryptionData = message.encryptedData && 
-                                   message.encryptedData.encryptedData && 
-                                   message.encryptedData.iv && 
-                                   message.encryptedData.authTag;
 
-          if (!hasEncryptionData) {
-            // This is an old message, return as unencrypted
             return {
-              ...message.toObject(),
-              isEncrypted: false,
-              securityLevel: 'legacy'
+              ...messageObj,
+              text: decryptedText,
+              isEncrypted: true,
+              securityLevel: message.encryption?.securityLevel || "enterprise",
+              integrityVerified: true,
+            };
+          } catch (decryptError) {
+            console.error(
+              "Failed to decrypt old message:",
+              message._id,
+              decryptError.message
+            );
+            return {
+              ...messageObj,
+              text: "[Message could not be decrypted]",
+              isEncrypted: true,
+              decryptionError: true,
             };
           }
-          
-          // Check if this is a partially encrypted message (has encryption data but fails verification)
-          // This could be from the transition period when encryption was being implemented
-          if (message.text && typeof message.text === 'string' && message.text.length > 0) {
-            // Check if the text looks like encrypted data (base64 string)
-            const isEncryptedText = /^[A-Za-z0-9+/=]+$/.test(message.text) && message.text.length > 20;
-            
-            if (isEncryptedText) {
-              // This is encrypted text that failed to decrypt, try to decrypt it directly
-              try {
-                const sharedKey = await keyManager.generateSharedKey(myId, userToChatId);
-                const decryptedText = encryptionService.decrypt({
-                  encryptedData: message.text,
-                  iv: message.encryptedData?.iv || '',
-                  authTag: message.encryptedData?.authTag || ''
-                }, sharedKey);
-                
-                return {
-                  ...message.toObject(),
-                  text: decryptedText,
-                  isEncrypted: true,
-                  securityLevel: 'enterprise'
-                };
-              } catch (directDecryptError) {
-                // If direct decryption also fails, treat as legacy
-                return {
-                  ...message.toObject(),
-                  isEncrypted: false,
-                  securityLevel: 'legacy'
-                };
-              }
-            } else {
-              // If there's readable text, treat as legacy message
-              return {
-                ...message.toObject(),
-                isEncrypted: false,
-                securityLevel: 'legacy'
-              };
-            }
-          }
-          
-          // This is a new encrypted message that failed to decrypt
-          return {
-            ...message.toObject(),
-            text: "[Message could not be decrypted]",
-            isEncrypted: true,
-            decryptionError: true
-          };
         }
+
+        // New format: text is already plain, just return with metadata
+        return {
+          ...messageObj,
+          isEncrypted: message.encryption?.isEncrypted || false,
+          securityLevel: message.encryption?.securityLevel || "legacy",
+        };
       })
     );
 
-    res.status(200).json(decryptedMessages);
+    res.status(200).json(processedMessages);
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -170,7 +134,7 @@ export const sendMessage = async (req, res) => {
         resource_type: "raw",
         public_id: `files/${Date.now()}_${file.name}`,
       });
-      
+
       fileData = {
         url: uploadResponse.secure_url,
         name: file.name,
@@ -180,39 +144,37 @@ export const sendMessage = async (req, res) => {
     }
 
     // Encrypt text message if present
-    let encryptedText = null;
     let encryptedData = null;
     let encryptionInfo = null;
 
     if (text && text.trim()) {
       try {
         // Create secure message envelope
-        const secureMessage = encryptionService.createSecureMessage(text, sharedKey);
-        
+        const secureMessage = encryptionService.createSecureMessage(
+          text,
+          sharedKey
+        );
+
         encryptedData = {
           encryptedData: secureMessage.encryptedData,
           iv: secureMessage.iv,
           authTag: secureMessage.authTag,
           algorithm: secureMessage.algorithm,
           messageHash: secureMessage.messageHash,
-          keyId: await keyManager.generateKeyId()
+          keyId: await keyManager.generateKeyId(),
         };
 
         encryptionInfo = {
           isEncrypted: true,
-          securityLevel: 'enterprise',
-          encryptedAt: new Date()
+          securityLevel: "enterprise",
+          encryptedAt: new Date(),
         };
-
-        // Store encrypted text (for backward compatibility)
-        encryptedText = secureMessage.encryptedData;
       } catch (encryptionError) {
         console.error("Encryption failed:", encryptionError);
         // Fallback to unencrypted message
-        encryptedText = text;
         encryptionInfo = {
           isEncrypted: false,
-          securityLevel: 'legacy'
+          securityLevel: "legacy",
         };
       }
     }
@@ -220,7 +182,7 @@ export const sendMessage = async (req, res) => {
     const newMessage = new Message({
       senderId,
       receiverId,
-      text: encryptedText, // Store encrypted text
+      text: text, // Store plain text (encryption data is in encryptedData field)
       encryptedData: encryptedData,
       encryption: encryptionInfo,
       image: imageUrl,
@@ -235,9 +197,9 @@ export const sendMessage = async (req, res) => {
       ...newMessage.toObject(),
       text: text, // Send original text to client
       isEncrypted: encryptionInfo?.isEncrypted || false,
-      securityLevel: encryptionInfo?.securityLevel || 'legacy',
+      securityLevel: encryptionInfo?.securityLevel || "legacy",
       // Remove encrypted data from client response for security
-      encryptedData: undefined
+      encryptedData: undefined,
     };
 
     const receiverSocketId = getReceiverSocketId(receiverId);
@@ -269,13 +231,15 @@ export const addReaction = async (req, res) => {
     }
 
     // Convert Map to Object for easier manipulation
-    const reactionsObj = message.reactions.toObject ? message.reactions.toObject() : message.reactions;
-    
+    const reactionsObj = message.reactions.toObject
+      ? message.reactions.toObject()
+      : message.reactions;
+
     // Add user to emoji reaction
     if (!reactionsObj[emoji]) {
       reactionsObj[emoji] = [];
     }
-    
+
     if (!reactionsObj[emoji].includes(userId)) {
       reactionsObj[emoji].push(userId);
     }
@@ -287,12 +251,18 @@ export const addReaction = async (req, res) => {
     // Emit reaction update to both users
     const senderSocketId = getReceiverSocketId(message.senderId.toString());
     const receiverSocketId = getReceiverSocketId(message.receiverId.toString());
-    
+
     if (senderSocketId) {
-      io.to(senderSocketId).emit("reactionUpdate", { messageId, reactions: reactionsObj });
+      io.to(senderSocketId).emit("reactionUpdate", {
+        messageId,
+        reactions: reactionsObj,
+      });
     }
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("reactionUpdate", { messageId, reactions: reactionsObj });
+      io.to(receiverSocketId).emit("reactionUpdate", {
+        messageId,
+        reactions: reactionsObj,
+      });
     }
 
     res.status(200).json({ messageId, reactions: reactionsObj });
@@ -314,12 +284,16 @@ export const removeReaction = async (req, res) => {
     }
 
     // Convert Map to Object for easier manipulation
-    const reactionsObj = message.reactions.toObject ? message.reactions.toObject() : message.reactions;
-    
+    const reactionsObj = message.reactions.toObject
+      ? message.reactions.toObject()
+      : message.reactions;
+
     // Remove user from emoji reaction
     if (reactionsObj[emoji]) {
-      reactionsObj[emoji] = reactionsObj[emoji].filter(id => id.toString() !== userId.toString());
-      
+      reactionsObj[emoji] = reactionsObj[emoji].filter(
+        (id) => id.toString() !== userId.toString()
+      );
+
       // Remove emoji if no users left
       if (reactionsObj[emoji].length === 0) {
         delete reactionsObj[emoji];
@@ -333,12 +307,18 @@ export const removeReaction = async (req, res) => {
     // Emit reaction update to both users
     const senderSocketId = getReceiverSocketId(message.senderId.toString());
     const receiverSocketId = getReceiverSocketId(message.receiverId.toString());
-    
+
     if (senderSocketId) {
-      io.to(senderSocketId).emit("reactionUpdate", { messageId, reactions: reactionsObj });
+      io.to(senderSocketId).emit("reactionUpdate", {
+        messageId,
+        reactions: reactionsObj,
+      });
     }
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("reactionUpdate", { messageId, reactions: reactionsObj });
+      io.to(receiverSocketId).emit("reactionUpdate", {
+        messageId,
+        reactions: reactionsObj,
+      });
     }
 
     res.status(200).json({ messageId, reactions: reactionsObj });
@@ -360,11 +340,13 @@ export const markAsRead = async (req, res) => {
 
     // Only the receiver can mark as read
     if (message.receiverId.toString() !== userId.toString()) {
-      return res.status(403).json({ error: "Unauthorized to mark this message as read" });
+      return res
+        .status(403)
+        .json({ error: "Unauthorized to mark this message as read" });
     }
 
     // Update message status
-    message.status = 'read';
+    message.status = "read";
     message.readAt = new Date();
     message.readBy = userId;
     await message.save();
@@ -373,21 +355,21 @@ export const markAsRead = async (req, res) => {
     const senderSocketId = getReceiverSocketId(message.senderId.toString());
     console.log("Emitting messageStatusUpdate to sender:", senderSocketId, {
       messageId,
-      status: 'read',
-      readAt: message.readAt
+      status: "read",
+      readAt: message.readAt,
     });
     if (senderSocketId) {
       io.to(senderSocketId).emit("messageStatusUpdate", {
         messageId,
-        status: 'read',
-        readAt: message.readAt
+        status: "read",
+        readAt: message.readAt,
       });
     }
 
-    res.status(200).json({ 
-      messageId, 
-      status: 'read', 
-      readAt: message.readAt 
+    res.status(200).json({
+      messageId,
+      status: "read",
+      readAt: message.readAt,
     });
   } catch (error) {
     console.log("Error in markAsRead controller: ", error.message);
@@ -405,12 +387,12 @@ export const markAllAsRead = async (req, res) => {
       {
         senderId: senderId,
         receiverId: userId,
-        status: { $ne: 'read' }
+        status: { $ne: "read" },
       },
       {
-        status: 'read',
+        status: "read",
         readAt: new Date(),
-        readBy: userId
+        readBy: userId,
       }
     );
 
@@ -418,18 +400,18 @@ export const markAllAsRead = async (req, res) => {
     const senderSocketId = getReceiverSocketId(senderId);
     console.log("Emitting allMessagesRead to sender:", senderSocketId, {
       receiverId: userId,
-      readAt: new Date()
+      readAt: new Date(),
     });
     if (senderSocketId) {
       io.to(senderSocketId).emit("allMessagesRead", {
         receiverId: userId,
-        readAt: new Date()
+        readAt: new Date(),
       });
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
       updatedCount: result.modifiedCount,
-      readAt: new Date()
+      readAt: new Date(),
     });
   } catch (error) {
     console.log("Error in markAllAsRead controller: ", error.message);

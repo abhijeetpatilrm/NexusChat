@@ -19,7 +19,16 @@ const connectDB = async () => {
     if (!mongoUri) {
       throw new Error("Missing MONGO_URI/MONGODB_URI environment variable");
     }
-    await mongoose.connect(mongoUri);
+    console.log("Attempting to connect to MongoDB...");
+    console.log(
+      "Connection string (masked):",
+      mongoUri.replace(/:[^:@]+@/, ":****@")
+    );
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      family: 4,
+    });
     console.log("MongoDB Connected Successfully");
   } catch (error) {
     console.error("MongoDB connection error:", error);
